@@ -38,11 +38,11 @@ def getFields(resfile,numitems):
     try:
         fo=open(resfile,"w")
 # write headerfr
-        fo.write( "identifier"+"\t"+"title"+"\t"+"creator"+"\n")
+        fo.write( "identifier"+"\t"+"title"+"\t"+"creator"+"\t"+"date"+"\n")
         error_log = open('arxerrlog.txt', 'w+')
         url = "https://archive.org/services/search/v1/scrape?"
         basic_params = {'q': '(collection%3Adigitallibraryindia+AND+(language%3Atel++OR+language%3ATelugu))',
-                        'fields': 'identifier,title,creator,Publication Date', 'output': 'csv'}
+                        'fields': 'identifier,title,creator,date', 'output': 'json'}
         params = basic_params.copy()
         count=0
         while True:
@@ -65,9 +65,13 @@ def getFields(resfile,numitems):
                     dliid = i['identifier']
                     dlititle=i['title']
                     dlicreator=""
-                    if length>2 :
+
+                    if 'creator' in i:
                         dlicreator=i['creator']
-                    fo.write( dliid+"\t"+dlititle+"\t"+dlicreator+"\n" )
+                    dlidate=""
+                    if 'date' in i:
+                        dlidate=i['date'][0:10]
+                    fo.write( dliid+"\t"+dlititle+"\t"+dlicreator+"\t"+dlidate+"\n" )
                 cursor = data.get('cursor', None)
                 print(cursor)
                 if (numitems !=0) and (count > numitems):
@@ -82,4 +86,4 @@ def getFields(resfile,numitems):
         print ("Error: can\'t find file or read data")
 # getCollection("arxdlicat.txt")
 #getFields ("arxdlifields.txt", 200") numitems is zero for the whole data
-getFields ("arxdlifields.tsv", 0)
+getFields ("arxdlifields.tsv", 0)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   
