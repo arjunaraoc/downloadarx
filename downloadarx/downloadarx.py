@@ -1,9 +1,11 @@
 import requests
 import urllib.parse
 #using scraping API as page API fails for more than 10000 records.
+from internetarchive import get_item
+import re
 def getCollection(resfile):
     try:
-        fo=open(resfile,"w+")
+        fo=open(resfile,"w")
         error_log = open('arxerrlog.txt', 'w+')
         url = "https://archive.org/services/search/v1/scrape?"
         basic_params={ 'q':'(collection%3Adigitallibraryindia+AND+(language%3Atel++OR+language%3ATelugu))', 'fields':'description'}
@@ -34,6 +36,7 @@ def getCollection(resfile):
         fo.close()
     except IOError:
         print ("Error: can\'t find file or read data")
+
 def getFields(resfile,numitems):
     try:
         fo=open(resfile,"w")
@@ -86,4 +89,235 @@ def getFields(resfile,numitems):
         print ("Error: can\'t find file or read data")
 # getCollection("arxdlicat.txt")
 #getFields ("arxdlifields.txt", 200") numitems is zero for the whole data
-getFields ("arxdlifields.tsv", 0)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   
+#getFields ("arxdlifields.tsv", 0)
+#
+def getOrigMetaFields(inpfile,resfile,numitems):
+    try:
+
+        fo=open(resfile,"w")
+# write headerfr
+        fo.write( "id"+"\t"+"pubd"+"\t"+"totalpages"+"\n")
+        error_log = open('arxerrlog.txt', 'w+')
+        numline=0
+        with open(inpfile) as fi:
+            for line in fi:
+                m=re.search(r"Book Source: Digital Library of India Item ([0-9]+\.[0-9]+)",line)
+                if m:
+                    id=m.group(1)
+                else:
+                    break
+
+                datecite=""
+                searchstr="dc.date.citation"+": "+"([0-9]+[/|-]?[0-9]+[/|-]?[0-9]+)"
+                m = re.search(searchstr,line)
+                if m:
+                    datecite=m.group(1)
+
+                totpages=""
+                searchstr="dc.description.totalpages"+": "+"([0-9]+)"
+                m = re.search(searchstr, line)
+                if m:
+                    totpages = m.group(1)
+                fo.write(id+"\t"+datecite+"\t"+totpages+"\n")
+                numline+=1
+                if (numitems != 0) and (numline > numitems):
+                    break
+        fo.close()
+    except IOError:
+        print ("Error: can\'t find file or read data")
+
+#gets archive item fields and DLI description subfields
+def getCollection2(resfile,numitems):
+    try:
+        fo=open(resfile,"w")
+        error_log = open('arxerrlog.txt', 'w+')
+        url = "https://archive.org/services/search/v1/scrape?"
+        basic_params={ 'q':'(collection%3Adigitallibraryindia+AND+(language%3Atel++OR+language%3ATelugu))',
+                       'fields':'identifier,title,creator,date,description'}
+        params=basic_params.copy()
+        numline = 0
+        fo.write( "id"+"\t"+"title"+"\t"+"creator"+"\t"+"pubd"+"\t"+"pages"+"\t"+"bc"+"\n")
+        while True:
+            try:
+
+                params_str= "&".join("%s=%s" % (k, v) for k, v in params.items())
+                print (params_str)
+                resp = requests.get(url+params_str, headers={})
+            except requests.exceptions.RequestException as e:  # This is the correct syntax
+                error_log.write('Could not get search result' + url + params+' because of error: %s\n' % e)
+                print ("There was an error; writing to log.")
+                sys.exit(1)
+            else:
+                data= resp.json()
+                #write results
+                iadict=data["items"]
+                for i in iadict:
+                    iaid=i['identifier']
+
+                    iatitle=""
+                    if 'title' in i:
+                        iatitle=i['title']
+                    iacreator=""
+                    if 'creator' in i:
+                        iacreator= i['creator']
+                    iadate=""
+                    if 'date' in i:
+                        iadate= i['date']
+                    iadesc=""
+                    iadesc_totpages=""
+                    iadesc_barcode=""
+                    if 'description' in i:
+                        iadesc=i['description']
+                        
+                        totpagessearchstr = "dc.description.totalpages" + ": " + "([0-9]+)"
+                        m = re.search(totpagessearchstr,iadesc)
+                        if m:
+                            iadesc_totpages = m.group(1)
+                        
+                        # barcode search
+                        bcsearchstr = "dc.identifier.barcode" + ": " + "([0-9]+)"
+                        m = re.search(bcsearchstr,iadesc)
+                        if m:
+                            iadesc_barcode = m.group(1)
+
+
+                    fo.writelines("%s\t%s\t%s\t%s\t%s\t%s\n" % (iaid,iatitle,iacreator,iadate,
+                                                                    iadesc_totpages,iadesc_barcode))
+                    numline += 1
+                    if (numitems != 0) and (numline > numitems):
+                        break
+                if (numitems != 0) and (numline > numitems):
+                    break
+                cursor = data.get('cursor', None)
+                print(cursor)
+                if cursor is None:
+                    break
+                else:
+                    params = basic_params.copy()
+                    params['cursor'] = cursor
+        fo.close()
+    except IOError:
+        print ("Error: can\'t find file or read data")
+
+
+# for duplicates csv file, get size, output duplicates,sizes,comparison status
+def sizeCompareForDuplicates(inpfile,outpfile, numlines):
+    import subprocess
+    import json
+    try:
+        fo=open(outpfile,"w")
+        error_log = open('arxerrlog.txt', 'w+')
+        line=1
+        result = []
+        resultset=set()
+        fi=open(inpfile,"r")
+        for row in fi.readlines():
+            row=row.strip("\n")
+            idlist=row.split(sep=",")
+            index=0
+            result.clear()
+            resultset.clear()
+            for id in idlist:
+                cmd1="ia"
+                cmd2="metadata"
+                cmd3=id
+                #cmd4='|jq \".files[0].size\"'
+                response=json.loads((subprocess.run([cmd1,cmd2,cmd3], stdout=subprocess.PIPE).stdout.decode('utf-8')))
+                response2=response['files']
+                size='0'
+                for obj in response2:
+                    if obj['name'].find(".pdf")!= -1:
+                        size=obj['size']
+                        break
+                if(int(size)==0):
+                    print("Error, Did not find pdf file for determining size")
+                    exit(-1)
+                result.append(size)
+                index+=1
+            #compare resulting sizes
+            resultset=set(result)
+            if len(resultset)==1:
+                 compare="Success"
+            else:
+                compare="Fail"
+            #write resultline
+            index=0;
+            for id in idlist:
+                fo.write(id+"("+result[index]+")")
+                index+=1
+            fo.write("("+compare+")"+"\n")
+            print(line,compare)
+            line += 1
+            if (numlines != 0) and (line > numlines):
+                break
+
+    except IOError:
+        print("Error: can\'t find file or read data")
+#sizeCompareForDuplicates("flagdupset.csv","flagdupsetresult.csv",0)
+
+# for duplicates csv file, get size, output duplicates,sizes,comparison status using api call for speedup
+def sizeCompareForDuplicates2(inpfile,outpfile, numlines):
+    import subprocess
+    import json
+    url = "https://archive.org/metadata/"
+    try:
+        fo=open(outpfile,"w")
+        error_log = open('arxerrlog.txt', 'w+')
+        line=1
+        result = []
+        resultset=set()
+        fi=open(inpfile,"r")
+        for row in fi.readlines():
+            row=row.strip("\n")
+            idlist=row.split(sep=",")
+            index=0
+            result.clear()
+            resultset.clear()
+            for id in idlist:
+                params_str = "%s/files" % id
+                print(params_str)
+                try:
+                    resp = requests.get(url + params_str, headers={})
+                except requests.exceptions.RequestException as e:  # This is the correct syntax
+                    error_log.write('Could not get search result' + url + params + ' because of error: %s\n' % e)
+                    print("There was an error; writing to log.")
+                    sys.exit(1)
+                else:
+                    data = resp.json()['result']
+
+                size='0'
+                for obj in data:
+                    if obj['name'].find(".pdf")!= -1:
+                        size=obj['size']
+                        break
+                if(int(size)==0):
+                    print("Error, Did not find pdf file for determining size")
+                    exit(-1)
+                result.append(size)
+                index+=1
+            #compare resulting sizes
+            resultset=set(result)
+            if len(resultset)==1:
+                 compare="Success"
+            else:
+                compare="Fail"
+            #write resultline
+            index=0;
+            for id in idlist:
+                fo.write(id+"("+result[index]+")")
+                index+=1
+            fo.write("("+compare+")"+"\n")
+            print(line,compare)
+            line += 1
+            if (numlines != 0) and (line > numlines):
+                break
+
+    except IOError:
+        print("Error: can\'t find file or read data")
+sizeCompareForDuplicates2("flagdupset.csv","flagdupsetresult2.csv",0)
+
+#getCollection("arxdlicat.txt")
+#getFields ("arxdlifields.txt", 200") numitems is zero for the whole data
+#getFields ("""arxdlifields.tsv", 0)
+#getOrigMetaFields("arxdlicat.txt", "idfields.tsv",0)
+#getCollection2("arxtelcat.tsv",0)#getCollection3("arxtelsize.tsv",10)
