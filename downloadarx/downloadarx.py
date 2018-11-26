@@ -314,7 +314,56 @@ def sizeCompareForDuplicates2(inpfile,outpfile, numlines):
 
     except IOError:
         print("Error: can\'t find file or read data")
-sizeCompareForDuplicates2("flagdupset.csv","flagdupsetresult2.csv",0)
+#sizeCompareForDuplicates2("flagdupset.csv","flagdupsetresult2.csv",0)
+
+
+# Read from the duplicates size comparison output, when there is success, write the ids, when there is a fail,
+# find subsets which have samesize, write their ids, and also write uniques if exist() using csv module
+def splitdup_size(inpfile, outfile,numlines):
+    import pandas as pd
+    import numpy as np
+    import csv
+
+    line = 0
+    fi = open(inpfile, 'r')
+    csvfile = open(outfile, 'w', newline="")
+    writer = csv.writer(csvfile, delimiter=",")
+    for row in fi.readlines():
+        line += 1
+        if row.find("Fail") != -1:
+            row = row.replace(",Fail\n", "")
+            info = row.split(",")
+            ids = []
+            sizes = []
+            for i, j in zip(info[0::2], info[1::2]):
+                ids.append(i)
+                sizes.append(j)
+            isf = pd.DataFrame({'id': pd.Series(ids), 'size': sizes})
+            isfg = isf.groupby(['size'], sort=False)
+
+            for name, group in isfg:
+                duplist = group['id'].tolist()
+                writer.writerow(duplist)
+        else:
+            row = row.replace(",Success\n", "")
+            info = row.split(",")
+            ids = []
+            sizes = []
+            for i, j in zip(info[0::2], info[1::2]):
+                ids.append(i)
+                sizes.append(j)
+            isf = pd.DataFrame({'id': pd.Series(ids), 'size': sizes})
+            isfg = isf.groupby(['size'], sort=False)
+            for name, group in isfg:
+                duplist = group['id'].tolist()
+                writer.writerow(duplist)
+        print(line)
+        if (numlines != 0) and (line > numlines):
+            break
+
+    csvfile.close()
+
+splitdup_size('flagdupsetresult2trans.csv','flagduprevised.csv',0)
 
 #getCollection("arxdlicat.txt")
 #getFields ("arxdlifields.txt", 200") numitems is zero for the whole data
