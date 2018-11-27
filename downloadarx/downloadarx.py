@@ -304,18 +304,17 @@ def sizeCompareForDuplicates2(inpfile,outpfile, numlines):
             #write resultline
             index=0;
             for id in idlist:
-                fo.write(id+"("+result[index]+")")
+                fo.write(id+","+result[index]+",")
                 index+=1
-            fo.write("("+compare+")"+"\n")
-            print(line,compare)
+            fo.write(compare+"\n")
             line += 1
+            print(line,compare)
             if (numlines != 0) and (line > numlines):
                 break
 
     except IOError:
         print("Error: can\'t find file or read data")
 #sizeCompareForDuplicates2("flagdupset.csv","flagdupsetresult2.csv",0)
-
 
 # Read from the duplicates size comparison output, when there is success, write the ids, when there is a fail,
 # find subsets which have samesize, write their ids, and also write uniques if exist() using csv module
@@ -363,7 +362,7 @@ def splitdup_size(inpfile, outfile,numlines):
 
     csvfile.close()
 
-splitdup_size('flagdupsetresult2trans.csv','flagduprevised.csv',0)
+#splitdup_size('flagdupsetresult2trans.csv','flagduprevised.csv',0)
 
 #getCollection("arxdlicat.txt")
 #getFields ("arxdlifields.txt", 200") numitems is zero for the whole data
