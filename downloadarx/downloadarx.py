@@ -136,7 +136,7 @@ def getCollection2(resfile,numitems):
                        'fields':'identifier,title,creator,date,description'}
         params=basic_params.copy()
         numline = 0
-        fo.write( "id"+"\t"+"title"+"\t"+"creator"+"\t"+"pubd"+"\t"+"pages"+"\t"+"bc"+"\n")
+        fo.write( "id"+"\t"+"title"+"\t"+"creator"+"\t"+"pubd"+"\t"+"pages"+"\t"+"bc"+"\t"+"subject"+"\n")
         while True:
             try:
 
@@ -166,6 +166,7 @@ def getCollection2(resfile,numitems):
                     iadesc=""
                     iadesc_totpages=""
                     iadesc_barcode=""
+                    iadesc_sub=""
                     if 'description' in i:
                         iadesc=i['description']
                         
@@ -180,9 +181,12 @@ def getCollection2(resfile,numitems):
                         if m:
                             iadesc_barcode = m.group(1)
 
+                        subsearchstr="(?<=dc.subject.classification: )(.+?)(?= dc\.|$)"
+                        match=re.findall(subsearchstr, iadesc)
+                        iadesc_sub='|'.join(match)
 
-                    fo.writelines("%s\t%s\t%s\t%s\t%s\t%s\n" % (iaid,iatitle,iacreator,iadate,
-                                                                    iadesc_totpages,iadesc_barcode))
+                    fo.writelines("%s\t%s\t%s\t%s\t%s\t%s\t%s\n" % (iaid,iatitle,iacreator,iadate,
+                                                                    iadesc_totpages,iadesc_barcode,iadesc_sub))
                     numline += 1
                     if (numitems != 0) and (numline > numitems):
                         break
@@ -199,6 +203,10 @@ def getCollection2(resfile,numitems):
     except IOError:
         print ("Error: can\'t find file or read data")
 
+getCollection2("arxtelnodup.tsv",0)
+
+
+#getCollection3("arxtelsize.tsv",10)
 
 # for duplicates csv file, get size, output duplicates,sizes,comparison status
 def sizeCompareForDuplicates(inpfile,outpfile, numlines):
@@ -368,4 +376,4 @@ def splitdup_size(inpfile, outfile,numlines):
 #getFields ("arxdlifields.txt", 200") numitems is zero for the whole data
 #getFields ("""arxdlifields.tsv", 0)
 #getOrigMetaFields("arxdlicat.txt", "idfields.tsv",0)
-#getCollection2("arxtelcat.tsv",0)#getCollection3("arxtelsize.tsv",10)
+
